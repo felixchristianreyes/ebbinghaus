@@ -11,7 +11,7 @@ class CardObserver
      */
     public function created(Card $card): void
     {
-        $card->reviews()->create(
+        $card->review()->create(
             [
                 'next_review_at' => now()->addDays(1),
                 'interval_days' => 1,
