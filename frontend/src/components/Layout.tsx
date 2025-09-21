@@ -1,24 +1,25 @@
 import { Outlet, Link } from "react-router";
+import { Button } from "@/components/ui/button";
 
 const Layout = () => {
   return (
-    <div className="app-container">
-      <nav className="navbar">
-        <div className="nav-content">
-          <Link to="/" className="nav-logo">
+    <div>
+      <nav className="mx-5">
+        <div className="container flex h-14 items-center justify-between">
+          <Link to="/" className="text-base font-semibold">
             Ebbinghaus
           </Link>
-          <ul className="nav-links">
-            <li>
-              <Link to="/">Decks</Link>
-            </li>
-            <li>
-              <Link to="/study">Study</Link>
-            </li>
-          </ul>
+          <div className="flex items-center gap-2">
+            <Link to="/">
+              <Button variant="ghost">Decks</Button>
+            </Link>
+            <Link to="/study">
+              <Button>Study</Button>
+            </Link>
+          </div>
         </div>
       </nav>
-      <main className="main-content">
+      <main className="container py-6">
         <Outlet />
       </main>
     </div>
