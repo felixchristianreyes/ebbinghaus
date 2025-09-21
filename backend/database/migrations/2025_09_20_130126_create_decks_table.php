@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('decks', function (Blueprint $table) {
             $table->id();
             $table->text('title');
-            $table->text('description');
+            $table->text('description')->nullable();
             $table->timestamps();
         });
     }
