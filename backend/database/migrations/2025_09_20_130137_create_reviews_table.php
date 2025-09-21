@@ -14,9 +14,15 @@ return new class extends Migration
         Schema::create('reviews', function (Blueprint $table) {
             $table->id();
             $table->foreignId('card_id')->constrained()->cascadeOnDelete();
-            $table->dateTime('next_review_at');
-            $table->integer('interval_days');
-            $table->dateTime('last_reviewed_at');
+            
+            /* need for sm-2 algorithm computation */
+            $table->integer('repetitions')->default(0);
+            $table->float('ease_factor', 8, 2)->default(2.5);
+            $table->integer('interval')->default(1);
+            /* need for sm-2 algorithm computation */
+            
+            $table->dateTime('next_review_date')->nullable();
+            $table->dateTime('last_reviewed_at')->nullable();
             $table->integer('last_review_quality'); // 1-5 (1 is easiest, 5 is hardest)
             $table->timestamps();
         });
