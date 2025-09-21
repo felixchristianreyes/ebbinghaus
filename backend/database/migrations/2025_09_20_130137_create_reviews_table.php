@@ -23,7 +23,7 @@ return new class extends Migration
             
             $table->dateTime('next_review_date')->nullable();
             $table->dateTime('last_reviewed_at')->nullable();
-            $table->integer('last_review_quality'); // 1-5 (1 is easiest, 5 is hardest)
+            $table->integer('last_review_quality')->nullable(); // 1-5 (1 is easiest, 5 is hardest)
             $table->timestamps();
         });
     }

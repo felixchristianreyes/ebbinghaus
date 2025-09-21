@@ -9,9 +9,6 @@ class CardObserver
     /**
      * Handle the Card "created" event.
      */
-    /**
-     * Handle the Card "created" event.
-     */
     public function created(Card $card): void
     {
         $card->review()->create([
