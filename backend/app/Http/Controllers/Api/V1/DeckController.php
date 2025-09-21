@@ -77,7 +77,41 @@ class DeckController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        try {
+            $validated = $request->validate([
+                'title' => 'required|string|max:255',
+                'description' => 'nullable|string',
+            ]);
+
+            $deck = Deck::create([
+                'title' => $validated['title'],
+                'description' => $validated['description'] ?? null,
+            ]);
+
+            return response()->json([
+                'message' => 'Deck created successfully',
+                'data' => $deck
+            ], 201);
+
+        } catch (ValidationException $e) {
+            // Handles validation errors
+            return response()->json([
+                'message' => 'The given data was invalid',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (QueryException $e) {
+            // Handles database query errors
+            return response()->json([
+                'message' => 'Failed to create deck',
+                'error' => $e->getMessage()
+            ], 500);
+        } catch (\Exception $e) {
+            // Handles other exceptions
+            return response()->json([
+                'message' => 'Something went wrong',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
