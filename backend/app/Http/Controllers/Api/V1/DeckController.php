@@ -19,7 +19,6 @@ class DeckController extends Controller
 
         try {
 
-            // Validate the request
             $validated = $request->validate([
                 'search' => 'nullable|string|max:255',
                 'sort_by' => 'nullable|string|in:title,description,created_at,updated_at',
@@ -30,7 +29,6 @@ class DeckController extends Controller
 
             $query = Deck::query();
 
-            // Check for search query
             if (!empty($validated['search'])) {
                 $query->where(function ($q) use ($validated) {
                     $q->where('title', 'ilike', "%{$validated['search']}%")
@@ -38,14 +36,12 @@ class DeckController extends Controller
                 });
             }
 
-            // Get sorting parameters with defaults
             $sortField = $validated['sort_by'] ?? 'created_at';
             $sortDirection = $validated['sort_dir'] ?? 'desc';
 
             $query->orderBy($sortField, $sortDirection);
 
-            // Get pagination with validation
-            $perPage = min($validated['per_page'] ?? 10, 100); // Max 100 items per page
+            $perPage = min($validated['per_page'] ?? 10, 100);
             $decks = $query->paginate($perPage);
 
             return response()->json($decks, Response::HTTP_OK);
@@ -59,13 +55,11 @@ class DeckController extends Controller
                 Response::HTTP_UNPROCESSABLE_ENTITY
             );
         } catch (QueryException $e) {
-            // Handles database query errors
             return response()->json([
                 'message' => 'Database query error',
                 'error' => $e->getMessage()
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         } catch (\Exception $e) {
-            // Handles other exceptions
             return response()->json([
                 'message' => 'Something went wrong',
                 'error' => $e->getMessage()
@@ -92,25 +86,22 @@ class DeckController extends Controller
             return response()->json([
                 'message' => 'Deck created successfully',
                 'data' => $deck
-            ], 201);
+            ], Response::HTTP_CREATED);
         } catch (ValidationException $e) {
-            // Handles validation errors
             return response()->json([
                 'message' => 'The given data was invalid',
                 'errors' => $e->errors()
-            ], 422);
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         } catch (QueryException $e) {
-            // Handles database query errors
             return response()->json([
                 'message' => 'Failed to create deck',
                 'error' => $e->getMessage()
-            ], 500);
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         } catch (\Exception $e) {
-            // Handles other exceptions
             return response()->json([
                 'message' => 'Something went wrong',
                 'error' => $e->getMessage()
-            ], 500);
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -184,7 +175,6 @@ class DeckController extends Controller
     public function destroy(string $id)
     {
         try {
-            // Find the deck
             $deck = Deck::with('cards')->find($id);
 
             if (!$deck) {
