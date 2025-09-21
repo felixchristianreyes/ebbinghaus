@@ -9,16 +9,19 @@ class CardObserver
     /**
      * Handle the Card "created" event.
      */
+    /**
+     * Handle the Card "created" event.
+     */
     public function created(Card $card): void
     {
-        $card->review()->create(
-            [
-                'next_review_at' => now()->addDays(1),
-                'interval_days' => 1,
-                'last_review_at' => now(),
-                'last_review_quality' => 3,
-            ]
-        );
+        $card->review()->create([
+            'next_review_date' => now(),
+            'repetitions' => 0,
+            'ease_factor' => 2.5,
+            'interval' => 1,
+            'last_reviewed_at' => null,
+            'last_review_quality' => null,
+        ]);
     }
 
     /**

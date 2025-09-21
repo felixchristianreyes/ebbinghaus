@@ -19,6 +19,7 @@ class Review extends Model
         'interval',
         'next_review_date',
         'last_reviewed_at',
+        'last_review_quality',
     ];
 
     /**
