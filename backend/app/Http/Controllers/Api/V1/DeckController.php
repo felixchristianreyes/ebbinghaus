@@ -119,7 +119,26 @@ class DeckController extends Controller
      */
     public function show(string $id)
     {
-        //
+        try {
+            $deck = Deck::find($id);
+
+            if (!$deck) {
+                return response()->json([
+                    'message' => 'Deck not found'
+                ], 404);
+            }
+
+            return response()->json([
+                'message' => 'Deck retrieved successfully',
+                'data' => $deck
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to retrieve deck',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -127,7 +146,38 @@ class DeckController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        try {
+            $deck = Deck::find($id);
+
+            if (!$deck) {
+                return response()->json([
+                    'message' => 'Deck not found'
+                ], 404);
+            }
+
+            $validated = $request->validate([
+                'title' => 'sometimes|required|string|max:255',
+                'description' => 'nullable|string',
+            ]);
+
+            $deck->update($validated);
+
+            return response()->json([
+                'message' => 'Deck updated successfully',
+                'data' => $deck->fresh()
+            ]);
+
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'The given data was invalid',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to update deck',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -135,6 +185,38 @@ class DeckController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        try {
+            // Find the deck
+            $deck = Deck::with('cards')->find($id);
+
+            if (!$deck) {
+                return response()->json([
+                    'message' => 'Deck not found'
+                ], 404);
+            }
+
+            // Delete associated cards first (if any)
+            if ($deck->cards->isNotEmpty()) {
+                $deck->cards()->delete();
+            }
+
+            // Delete the deck
+            $deck->delete();
+
+            return response()->json([
+                'message' => 'Deck deleted successfully',
+                'data' => [
+                    'id' => (int)$id,
+                    'deleted' => true,
+                    'cards_deleted' => $deck->cards->count()
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to delete deck',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }
