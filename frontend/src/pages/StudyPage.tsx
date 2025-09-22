@@ -25,7 +25,7 @@ const StudyPage = () => {
     isError,
     error,
     refetch,
-  } = useQuery<QueueItem[]>({
+  } = useQuery<QueueItem[], Error>({
     queryKey: ["study-queue", { deckId }],
     queryFn: async () =>
       deckId ? await getDueForDeck(deckId) : await getDueAll(),
@@ -68,6 +68,17 @@ const StudyPage = () => {
     await mutateReview({ cardId: current.id, quality });
   };
 
+  const getErrorMessage = (e: unknown): string | null => {
+    if (!e) return null;
+    if (typeof e === "string") return e;
+    if (e instanceof Error) return e.message;
+    if (typeof e === "object" && "message" in e) {
+      const m = (e as { message?: unknown }).message;
+      return typeof m === "string" ? m : null;
+    }
+    return null;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -76,15 +87,6 @@ const StudyPage = () => {
           <p className="text-sm text-muted-foreground">
             {deckId ? `Deck #${deckId}` : "All decks"} • {queue.length} due
           </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => void refetch()}
-            disabled={loading}
-          >
-            Refresh
-          </Button>
         </div>
       </div>
 
@@ -96,8 +98,8 @@ const StudyPage = () => {
         )}
         {(isError || submitError) && !loading && (
           <div className="text-center text-sm text-destructive">
-            {(error as any)?.message ||
-              (submitError as any)?.message ||
+            {getErrorMessage(error) ||
+              getErrorMessage(submitError) ||
               "Something went wrong"}
           </div>
         )}
@@ -113,40 +115,53 @@ const StudyPage = () => {
         )}
         {!loading && !isError && current && (
           <div className="mx-auto flex max-w-2xl flex-col items-stretch gap-6">
-            <div className="rounded-md border bg-background p-6 shadow-sm">
-              <p className="mb-2 text-xs uppercase text-muted-foreground">
-                Front
-              </p>
-              <div className="whitespace-pre-wrap text-lg">{current.front}</div>
+            <div className="self-stretch">
+              <div className="[perspective:1000px]">
+                <button
+                  type="button"
+                  onClick={() => setShowBack((v) => !v)}
+                  className="relative block w-full focus:outline-none"
+                >
+                  <div
+                    className={`relative h-72 w-full transition-transform duration-500 [transform-style:preserve-3d] ${
+                      showBack ? "[transform:rotateY(180deg)]" : ""
+                    }`}
+                  >
+                    <div className="absolute inset-0 rounded-xl border bg-card p-6 shadow-sm [backface-visibility:hidden]">
+                      <div className="flex justify-center items-center h-full whitespace-pre-wrap text-lg">
+                        {current.front}
+                      </div>
+                    </div>
+                    <div className="bg-cyan-200 absolute inset-0 rounded-xl border p-6 shadow-sm [backface-visibility:hidden] [transform:rotateY(180deg)]">
+                      <div className="flex justify-center items-center h-full whitespace-pre-wrap text-lg">
+                        {showBack && current.back}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              </div>
             </div>
 
-            {showBack ? (
-              <div className="rounded-md border bg-background p-6 shadow-sm">
-                <p className="mb-2 text-xs uppercase text-muted-foreground">
-                  Back
+            {showBack && (
+              <div className="flex items-center justify-center">
+                <p className="text-sm text-muted-foreground">
+                  How well did you remember this card? 0 = didn't know, 5 = knew
+                  it perfectly
                 </p>
-                <div className="whitespace-pre-wrap text-lg">
-                  {current.back}
-                </div>
               </div>
-            ) : (
-              <Button onClick={() => setShowBack(true)} className="self-center">
-                Show Answer
-              </Button>
             )}
-
             {showBack && (
               <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
-                {[0, 1, 2, 3, 4, 5].map((q) => (
+                {[0, 1, 2, 3, 4, 5].map((quality) => (
                   <Button
-                    key={q}
-                    variant={
-                      q <= 2 ? "destructive" : q === 3 ? "secondary" : "default"
-                    }
+                    key={quality}
+                    variant="outline"
                     disabled={submitting}
-                    onClick={() => void handleGrade(q as 0 | 1 | 2 | 3 | 4 | 5)}
+                    onClick={() =>
+                      void handleGrade(quality as 0 | 1 | 2 | 3 | 4 | 5)
+                    }
                   >
-                    {q}
+                    {quality}
                   </Button>
                 ))}
               </div>

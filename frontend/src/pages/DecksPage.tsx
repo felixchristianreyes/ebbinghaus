@@ -4,8 +4,12 @@ import type {
   DeckCreateInput,
   DeckListQuery,
   DeckListResponse,
+  DeckEntityResponse,
 } from "@/api/decks/types";
 import DeckCard from "@/components/DeckCard";
+import { generateDeckWithAI } from "@/api/ai";
+import type { AiGeneratedDeck } from "@/api/ai";
+import { createCard } from "@/api/cards";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,8 +51,6 @@ import { z } from "zod";
 type SortBy = NonNullable<DeckListQuery["sort_by"]>;
 type SortDir = NonNullable<DeckListQuery["sort_dir"]>;
 
-const formatDate = (iso: string) => new Date(iso).toLocaleDateString();
-
 const DeckFormSchema = z.object({
   title: z.string().min(1, "Title is required").max(120, "Max 120 characters"),
   description: z
@@ -71,6 +73,14 @@ const DecksPage = () => {
   const [editTarget, setEditTarget] = useState<Deck | null>(null);
   const [deleteOpen, setDeleteOpen] = useState<boolean>(false);
   const [deleteTarget, setDeleteTarget] = useState<Deck | null>(null);
+
+  const [aiOpen, setAiOpen] = useState<boolean>(false);
+  const [aiPrompt, setAiPrompt] = useState<string>("");
+  const [aiNumCards, setAiNumCards] = useState<number>(15);
+  const [aiDifficulty, setAiDifficulty] = useState<"easy" | "medium" | "hard">(
+    "medium"
+  );
+  const [aiDeck, setAiDeck] = useState<AiGeneratedDeck | null>(null);
 
   const { data, isLoading, isError, error, refetch } = useQuery<
     DeckListResponse,
@@ -108,6 +118,11 @@ const DecksPage = () => {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["decks"] });
     },
+  });
+
+  const { mutateAsync: aiGenerateMutate, isPending: generating } = useMutation({
+    mutationKey: ["ai-generate-deck"],
+    mutationFn: generateDeckWithAI,
   });
 
   const onSubmitCreate = async (values: DeckFormData) => {
@@ -178,6 +193,38 @@ const DecksPage = () => {
     void refetch();
   };
 
+  const onSubmitAIGenerate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const result = await aiGenerateMutate({
+      prompt: aiPrompt,
+      num_cards: aiNumCards,
+      difficulty: aiDifficulty,
+    });
+    setAiDeck(result);
+  };
+
+  const onSaveAIDeck = async () => {
+    if (!aiDeck) return;
+    // 1) Create deck
+    const created = await createDeckMutate({
+      title: aiDeck.title,
+      description: aiDeck.description ?? null,
+    });
+    const createdTyped = created as DeckEntityResponse;
+    const newDeckId = createdTyped.data.id;
+    if (!newDeckId) throw new Error("Failed to get new deck id");
+    // 2) Create cards
+    await Promise.all(
+      aiDeck.cards.map((c) =>
+        createCard(newDeckId, { front: c.front, back: c.back })
+      )
+    );
+    setAiOpen(false);
+    setAiDeck(null);
+    setAiPrompt("");
+    await queryClient.invalidateQueries({ queryKey: ["decks"] });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -244,6 +291,170 @@ const DecksPage = () => {
                   </Button>
                 </DialogFooter>
               </form>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={aiOpen}
+            onOpenChange={(open) => {
+              setAiOpen(open);
+              if (!open) {
+                setAiDeck(null);
+              }
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button variant="outline">Generate with AI</Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Generate deck with AI</DialogTitle>
+                <DialogDescription>
+                  Describe what you want and we will draft a deck. Review before
+                  saving.
+                </DialogDescription>
+              </DialogHeader>
+
+              {!aiDeck && (
+                <form onSubmit={onSubmitAIGenerate} className="space-y-4">
+                  <div>
+                    <Label className="mb-1 block">Prompt</Label>
+                    <Textarea
+                      id="ai-prompt"
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
+                      placeholder="e.g. 20 basic Japanese N5 vocabulary cards with simple definitions"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <div>
+                      <Label className="mb-1 block">Number of cards</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={aiNumCards}
+                        onChange={(e) =>
+                          setAiNumCards(parseInt(e.target.value || "0", 10))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label className="mb-1 block">Difficulty</Label>
+                      <Select
+                        value={aiDifficulty}
+                        onValueChange={(v) =>
+                          setAiDifficulty(v as "easy" | "medium" | "hard")
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select difficulty" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectItem value="easy">Easy</SelectItem>
+                            <SelectItem value="medium">Medium</SelectItem>
+                            <SelectItem value="hard">Hard</SelectItem>
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button type="button" variant="outline">
+                        Cancel
+                      </Button>
+                    </DialogClose>
+                    <Button
+                      type="submit"
+                      disabled={generating || !aiPrompt.trim()}
+                    >
+                      {generating ? "Generating..." : "Generate"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              )}
+
+              {aiDeck && (
+                <div className="space-y-4">
+                  <div>
+                    <Label className="mb-1 block">Title</Label>
+                    <Input
+                      value={aiDeck.title}
+                      onChange={(e) =>
+                        setAiDeck({ ...aiDeck, title: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block">Description</Label>
+                    <Textarea
+                      value={aiDeck.description ?? ""}
+                      onChange={(e) =>
+                        setAiDeck({
+                          ...aiDeck,
+                          description: e.target.value || null,
+                        })
+                      }
+                      placeholder="Optional description"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">
+                      Cards ({aiDeck.cards.length})
+                    </div>
+                    <div className="max-h-[40vh] space-y-3 overflow-y-auto pr-2">
+                      {aiDeck.cards.map((card, idx) => (
+                        <div key={idx} className="rounded-md border p-3">
+                          <div className="mb-2 text-xs text-muted-foreground">
+                            Card {idx + 1}
+                          </div>
+                          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                            <div>
+                              <Label className="mb-1 block">Front</Label>
+                              <Textarea
+                                value={card.front}
+                                onChange={(e) => {
+                                  const next = [...aiDeck.cards];
+                                  next[idx] = {
+                                    ...card,
+                                    front: e.target.value,
+                                  };
+                                  setAiDeck({ ...aiDeck, cards: next });
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <Label className="mb-1 block">Back</Label>
+                              <Textarea
+                                value={card.back}
+                                onChange={(e) => {
+                                  const next = [...aiDeck.cards];
+                                  next[idx] = { ...card, back: e.target.value };
+                                  setAiDeck({ ...aiDeck, cards: next });
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setAiDeck(null)}
+                    >
+                      Back
+                    </Button>
+                    <Button type="button" onClick={onSaveAIDeck}>
+                      Save deck
+                    </Button>
+                  </DialogFooter>
+                </div>
+              )}
             </DialogContent>
           </Dialog>
         </div>
@@ -388,7 +599,6 @@ const DecksPage = () => {
         </div>
       </div>
 
-      {/* Edit Deck Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
           <DialogHeader>
@@ -438,7 +648,6 @@ const DecksPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Deck Confirm */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
