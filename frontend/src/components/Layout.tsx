@@ -1,28 +1,34 @@
-import { Outlet, Link } from "react-router";
+import { Outlet, NavLink, Link } from "react-router";
 import { Button } from "@/components/ui/button";
 
 const Layout = () => {
   return (
-    <div>
+    <>
       <nav className="mx-5">
-        <div className="container flex h-14 items-center justify-between">
+        <div className="flex h-14 items-center justify-between">
           <Link to="/" className="text-base font-semibold">
             Ebbinghaus
           </Link>
           <div className="flex items-center gap-2">
-            <Link to="/">
-              <Button variant="ghost">Decks</Button>
-            </Link>
-            <Link to="/study">
-              <Button>Study</Button>
-            </Link>
+            <NavLink to="/">
+              {({ isActive }) => (
+                <Button variant={isActive ? "secondary" : "ghost"}>Decks</Button>
+              )}
+            </NavLink>
+            <NavLink to="/study">
+              {({ isActive }) => (
+                <Button variant={isActive ? "secondary" : "ghost"}>Study</Button>
+              )}
+            </NavLink>
           </div>
         </div>
       </nav>
-      <main className="container py-6">
-        <Outlet />
-      </main>
-    </div>
+      <div className="flex justify-center m-6">
+        <main className="container">
+          <Outlet />
+        </main>
+      </div>
+    </>
   );
 };
 
