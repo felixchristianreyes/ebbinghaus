@@ -1,22 +1,7 @@
-import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router";
-import { Button } from "@/components/ui/button";
-import { getDeck } from "@/api/decks";
-import type { Deck } from "@/api/decks/types";
 import { createCard, deleteCard, getCards, updateCard } from "@/api/cards";
 import type { Card, CardCreateInput, CardUpdateInput } from "@/api/cards/types";
-import { useQuery } from "@tanstack/react-query";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogClose,
-} from "@/components/ui/dialog";
+import { getDeck } from "@/api/decks";
+import type { Deck } from "@/api/decks/types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,11 +12,57 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { Link, useParams } from "react-router";
+import { z } from "zod";
+
+const CardFormSchema = z.object({
+  front: z.string().min(1, "Front is required").max(2000, "Too long"),
+  back: z.string().min(1, "Back is required").max(2000, "Too long"),
+});
+
+type CardFormData = z.infer<typeof CardFormSchema>;
+
+type SortBy =
+  | "newest"
+  | "oldest"
+  | "front-a-z"
+  | "front-z-a"
+  | "back-a-z"
+  | "back-z-a";
+
+const sortByOptions: SortBy[] = [
+  "newest",
+  "oldest",
+  "front-a-z",
+  "front-z-a",
+  "back-a-z",
+  "back-z-a",
+];
 
 const DeckDetailsPage = () => {
   const params = useParams();
@@ -64,7 +95,10 @@ const DeckDetailsPage = () => {
   });
 
   const deck = (deckResp?.data ?? null) as Deck | null;
-  const cards = (cardsResp?.data ?? []) as Card[];
+  const allCards = useMemo(
+    () => (cardsResp?.data ?? []) as Card[],
+    [cardsResp?.data]
+  );
   const loading = loadingDeck || loadingCards;
   const error = isDeckError
     ? deckError?.message
@@ -79,13 +113,49 @@ const DeckDetailsPage = () => {
   const [deleteOpen, setDeleteOpen] = useState<boolean>(false);
   const [editTarget, setEditTarget] = useState<Card | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Card | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [sortBy, setSortBy] = useState<SortBy>("newest");
 
-  const CardFormSchema = z.object({
-    front: z.string().min(1, "Front is required").max(2000, "Too long"),
-    back: z.string().min(1, "Back is required").max(2000, "Too long"),
-  });
+  // Filter and sort cards
+  const filteredAndSortedCards = useMemo(() => {
+    let filtered = allCards;
 
-  type CardFormData = z.infer<typeof CardFormSchema>;
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = allCards.filter(
+        (card) =>
+          card.front.toLowerCase().includes(query) ||
+          card.back.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply sorting
+    const sorted = [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case "newest":
+          return (
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+        case "oldest":
+          return (
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+        case "front-a-z":
+          return a.front.localeCompare(b.front);
+        case "front-z-a":
+          return b.front.localeCompare(a.front);
+        case "back-a-z":
+          return a.back.localeCompare(b.back);
+        case "back-z-a":
+          return b.back.localeCompare(a.back);
+        default:
+          return 0;
+      }
+    });
+
+    return sorted;
+  }, [allCards, searchQuery, sortBy]);
 
   const createForm = useForm<CardFormData>({
     resolver: zodResolver(CardFormSchema),
@@ -168,7 +238,10 @@ const DeckDetailsPage = () => {
 
       <div className="rounded-md border">
         <div className="flex items-center justify-between px-4 py-3">
-          <h2 className="text-sm font-medium">Cards ({cards.length})</h2>
+          <h2 className="text-sm font-medium">
+            Cards ({filteredAndSortedCards.length}
+            {searchQuery.trim() && ` of ${allCards.length}`})
+          </h2>
           <div className="flex items-center gap-2">
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
               <DialogTrigger asChild>
@@ -222,6 +295,44 @@ const DeckDetailsPage = () => {
             </Dialog>
           </div>
         </div>
+
+        {/* Search and Filter Controls */}
+        <div className="border-t px-4 py-3">
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <Input
+                placeholder="Search cards..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="max-w-sm"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label
+                htmlFor="sort-select"
+                className="text-sm text-muted-foreground"
+              >
+                Sort by:
+              </Label>
+              <Select
+                value={sortBy}
+                onValueChange={(value: SortBy) => setSortBy(value)}
+              >
+                <SelectTrigger id="sort-select" className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {sortByOptions.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
         <div className="border-t">
           {loading && (
             <div className="px-4 py-8 text-center text-sm text-muted-foreground">
@@ -233,12 +344,21 @@ const DeckDetailsPage = () => {
               {error}
             </div>
           )}
-          {!loading && !error && cards.length === 0 && (
+          {!loading && !error && allCards.length === 0 && (
             <div className="px-4 py-12 text-center text-sm text-muted-foreground">
               No cards yet.
             </div>
           )}
-          {!loading && !error && cards.length > 0 && (
+          {!loading &&
+            !error &&
+            allCards.length > 0 &&
+            filteredAndSortedCards.length === 0 &&
+            searchQuery.trim() && (
+              <div className="px-4 py-12 text-center text-sm text-muted-foreground">
+                No cards match your search.
+              </div>
+            )}
+          {!loading && !error && filteredAndSortedCards.length > 0 && (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y">
                 <thead className="bg-accent/30">
@@ -255,7 +375,7 @@ const DeckDetailsPage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {cards.map((card) => (
+                  {filteredAndSortedCards.map((card) => (
                     <tr key={card.id} className="hover:bg-accent/30">
                       <td className="px-4 py-3 text-sm">{card.front}</td>
                       <td className="px-4 py-3 text-sm">{card.back}</td>
