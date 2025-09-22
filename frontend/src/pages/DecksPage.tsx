@@ -5,6 +5,7 @@ import type {
   DeckListQuery,
   DeckListResponse,
 } from "@/api/decks/types";
+import DeckCard from "@/components/DeckCard";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,20 +37,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link } from "react-router";
 import { z } from "zod";
 
 type SortBy = NonNullable<DeckListQuery["sort_by"]>;
@@ -339,96 +331,39 @@ const DecksPage = () => {
         </form>
       </div>
 
-      <div className="overflow-hidden rounded-md border">
-        <Table className="min-w-full">
-          <TableHeader className="bg-accent/30">
-            <TableRow>
-              <TableHead>Title</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead>Updated</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading && (
-              <TableRow>
-                <TableCell
-                  colSpan={5}
-                  className="px-4 py-8 text-center text-sm text-muted-foreground"
-                >
-                  Loading decks...
-                </TableCell>
-              </TableRow>
-            )}
-            {isError && (
-              <TableRow>
-                <TableCell
-                  colSpan={5}
-                  className="px-4 py-8 text-center text-sm text-destructive"
-                >
-                  {error?.message || "Failed to load decks"}
-                </TableCell>
-              </TableRow>
-            )}
-            {!isLoading && !isError && decks.length === 0 && (
-              <TableRow>
-                <TableCell
-                  colSpan={5}
-                  className="px-4 py-12 text-center text-sm text-muted-foreground"
-                >
-                  No decks found.
-                </TableCell>
-              </TableRow>
-            )}
-            {!isLoading &&
-              !isError &&
-              decks.map((deck) => (
-                <TableRow key={deck.id}>
-                  <TableCell>
-                    <Link
-                      to={`/decks/${deck.id}`}
-                      className="font-medium hover:underline"
-                    >
-                      {deck.title}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {deck.description || "—"}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {formatDate(deck.created_at)}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {formatDate(deck.updated_at)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-2">
-                      <Link to={`/study/${deck.id}`}>
-                        <Button size="sm" variant="secondary">
-                          Study
-                        </Button>
-                      </Link>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openEdit(deck)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => openDelete(deck)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-          </TableBody>
-        </Table>
+      <div>
+        {isLoading && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-36 animate-pulse rounded-xl border bg-accent/30"
+              />
+            ))}
+          </div>
+        )}
+        {isError && (
+          <div className="rounded-md border px-4 py-8 text-center text-sm text-destructive">
+            {error?.message || "Failed to load decks"}
+          </div>
+        )}
+        {!isLoading && !isError && decks.length === 0 && (
+          <div className="rounded-md border px-4 py-12 text-center text-sm text-muted-foreground">
+            No decks found.
+          </div>
+        )}
+        {!isLoading && !isError && decks.length > 0 && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {decks.map((deck) => (
+              <DeckCard
+                key={deck.id}
+                deck={deck}
+                onEdit={openEdit}
+                onDelete={openDelete}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between">
