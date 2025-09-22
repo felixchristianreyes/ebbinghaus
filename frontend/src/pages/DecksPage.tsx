@@ -34,7 +34,7 @@ import {
   SelectGroup,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from "@/components/ui/select";
 import {
   Table,
@@ -56,6 +56,17 @@ type SortBy = NonNullable<DeckListQuery["sort_by"]>;
 type SortDir = NonNullable<DeckListQuery["sort_dir"]>;
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString();
+
+const DeckFormSchema = z.object({
+  title: z.string().min(1, "Title is required").max(120, "Max 120 characters"),
+  description: z
+    .string()
+    .max(500, "Max 500 characters")
+    .optional()
+    .or(z.literal("")),
+});
+
+type DeckFormData = z.infer<typeof DeckFormSchema>;
 
 const DecksPage = () => {
   const [search, setSearch] = useState<string>("");
@@ -93,20 +104,6 @@ const DecksPage = () => {
   const totalPages = useMemo(() => meta?.last_page ?? 1, [meta]);
 
   const queryClient = useQueryClient();
-
-  const DeckFormSchema = z.object({
-    title: z
-      .string()
-      .min(1, "Title is required")
-      .max(120, "Max 120 characters"),
-    description: z
-      .string()
-      .max(500, "Max 500 characters")
-      .optional()
-      .or(z.literal("")),
-  });
-
-  type DeckFormData = z.infer<typeof DeckFormSchema>;
 
   const form = useForm<DeckFormData>({
     resolver: zodResolver(DeckFormSchema),
